@@ -8,7 +8,7 @@
 template<typename T>
 struct vector {
     typedef T* iterator;
-    typedef T* const const_iterator;
+    typedef const T* const_iterator;
 
     vector();                               // O(1) nothrow
     vector(vector const&);                  // O(N) strong
@@ -105,7 +105,7 @@ void vector<T>::clear_all() {
 template<typename T>
 vector<T>::vector(const vector& other) : vector() {
     if (other.capacity_ != 0) {
-        T* new_data = static_cast<T*>(operator new(other.capacity_ * sizeof(T)));
+        T* new_data = static_cast<T*>(operator new(other.size_ * sizeof(T)));
         try {
             copy_construct_all(new_data, other.data_, other.size_);
         } catch (...) {
@@ -113,16 +113,16 @@ vector<T>::vector(const vector& other) : vector() {
             throw;
         }
         data_ = new_data;
-        capacity_ = other.capacity_;
+        capacity_ = other.size_;
         size_ = other.size_;
     }
 }
 
 template<typename T>
 void vector<T>::swap(vector& other) {
-    std::swap(this->data_, other.data_);
-    std::swap(this->size_, other.size_);
-    std::swap(this->capacity_, other.capacity_);
+    std::swap(data_, other.data_);
+    std::swap(size_, other.size_);
+    std::swap(capacity_, other.capacity_);
 }
 
 template<typename T>
@@ -131,7 +131,7 @@ vector<T>& vector<T>::operator=(const vector& other) {
         return *this;
     }
     vector<T> tmp(other);
-    this->swap(tmp);
+    swap(tmp);
     return *this;
 }
 
@@ -284,15 +284,6 @@ typename vector<T>::iterator vector<T>::insert(vector::const_iterator pos, const
 template<typename T>
 typename vector<T>::iterator vector<T>::erase(vector::const_iterator pos) {
     return erase(pos, pos + 1);
-    /*
-    ptrdiff_t old_size = size_;
-    ptrdiff_t int_pos = pos - data_;
-    std::swap(*(data_ + int_pos), *(data_ + old_size - 1));
-    pop_back();
-    for (ptrdiff_t i = int_pos; i < old_size - 2; i++) {
-        std::swap(*(data_ + i), *(data_ + i + 1));
-    }
-    return data_ + int_pos + 1;*/
 }
 
 template<typename T>
@@ -314,7 +305,6 @@ void vector<T>::push_back_realloc(const T& val) {
     if (capacity_ == 0) {
         set_capacity(1);
         new(data_) T(val);
-        capacity_ = 1;
         size_ = 1;
     } else {
         T copy(val);
