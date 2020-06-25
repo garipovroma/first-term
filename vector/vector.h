@@ -104,7 +104,7 @@ void vector<T>::clear_all() {
 
 template<typename T>
 vector<T>::vector(const vector& other) : vector() {
-    if (other.capacity_ != 0) {
+    if (!other.empty()) {
         T* new_data = static_cast<T*>(operator new(other.size_ * sizeof(T)));
         try {
             copy_construct_all(new_data, other.data_, other.size_);
