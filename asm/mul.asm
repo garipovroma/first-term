@@ -3,20 +3,19 @@
                 global          _start
 _start:
 
-                sub             rsp, 5 * 128 * 8
+                sub             rsp, 4 * 128 * 8
                 lea             rdi, [rsp + 128 * 8]
                 mov             rcx, 128
                 call            read_long
                 mov             rdi, rsp
                 call            read_long
                 lea             rdi, [rsp + 128 * 8]
-                lea             rsi, [rsp]
-                lea             r8, [rsp + 2 * 128 * 8]
-                lea             r9, [rsp + 3 * 128 * 8]
+                lea             rsi, [rsp]                
+                lea             r9, [rsp + 2 * 128 * 8]
                 call            mul_long_long
                 
                 mov             rdi, r9
-                add             rcx, rcx       ;  256 qwords
+                add             rcx, rcx       ;  2 * rcx qwords
                 call            write_long
 
                 mov             al, 0x0a
@@ -28,11 +27,16 @@ _start:
 ; multuplies two long numbers
 ;    rdi --  adress of operand #1 (long number)
 ;    rsi -- adress of operand #2 (long number)
-;    r8 -- adress of buffer for inner calculations, which size = rcx qwords
 ;    rcx - length of long number in qwords
+;    r8 -- adress of inner buffer for calculations, which size = rcx qwords
 ; result:
-;    multiply is written to r9, 256 qwords
+;    multiply is written to r9, 2 * rcx qwords
 mul_long_long:                
+                shl             rcx, 3
+                sub             rsp, rcx
+                mov             r8, rsp
+                shr             rcx, 3
+                
                 push            rsi
                 push            rdi
                 push            rcx              
@@ -42,21 +46,18 @@ mul_long_long:
                 mov             r12, rcx
                 xor             r11, r11
 .loop:          
-                mov             rbx, [rsi]
-                lea             rsi, [rsi + 8]
+                mov             rbx, [rsi]                
                 call            special_mul_long_short
                 
                 push            rdi
                 push            rsi
-                
-                mov             rdi, r9
-                mov             rsi, r8
                 
                 call            special_add_long_long
 ;    r8 + r9 calculated                                
                 pop             rsi     
                 pop             rdi                
                 lea             r11, [r11 + 8]
+                lea             rsi, [rsi + 8]
                 
                 dec             r12
                 jnz             .loop
@@ -65,39 +66,46 @@ mul_long_long:
                 pop             r8
                 pop             rcx
                 pop             rdi 
-                pop             rsi                
+                pop             rsi       
+                
+                shl             rcx, 3
+                add             rsp, rcx                
+                shr             rcx, 3
+                
+                
                 ret                
                 
                 
 ; adds two long number
-;    rdi -- address of summand #1 (long number)
-;    rsi -- address of summand #2 (long number)
+;    r9 -- address of summand #1 (long number)
+;    r8 -- address of summand #2 (long number)
 ;    rcx -- length of long numbers in qwords
 ;    r11 -- offset in bytes
+;    r10 -- carry from previous special_mul_long_short operation
 ; result:
-;    sum is written to rdi
+;    sum is written to r9
 special_add_long_long:
-                push            rdi
-                push            rsi
+                push            r9
+                push            r8
                 push            rcx
                 push            r10
                 push            r11
 
                 clc
 .loop:
-                mov             rax, [rsi]
-                lea             rsi, [rsi + 8]
-                adc             [rdi + r11], rax
-                lea             rdi, [rdi + 8]
+                mov             rax, [r8]
+                lea             r8, [r8 + 8]
+                adc             [r9 + r11], rax
+                lea             r9, [r9 + 8]
                 dec             rcx
                 jnz             .loop
 
-                adc             [rdi + r11], r10
+                adc             [r9 + r11], r10
                 pop             r11
                 pop             r10
                 pop             rcx
-                pop             rsi
-                pop             rdi
+                pop             r8
+                pop             r9
                 ret
 
 
@@ -115,7 +123,7 @@ special_mul_long_short:
                 push            r8
                 push            rsi              
                 push            r9
-    
+                clc
                 xor             rsi, rsi                
 .loop:
                 mov             rax, [rdi]
