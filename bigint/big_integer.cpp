@@ -1,9 +1,8 @@
 #include "big_integer.h"
 
-big_integer::big_integer() {
-    sign = true;
-    mas = std::vector<uint32_t>();
-}
+static uint32_t MAX_DIGIT = UINT32_MAX;
+
+big_integer::big_integer() : mas(std::vector<uint32_t>()), sign(true) {}
 
 big_integer::~big_integer() = default;
 
@@ -12,16 +11,20 @@ big_integer::big_integer(int a) {
     if (a == 0) {
         return;
     }
-    long long x = a;
-    mas.push_back((x > 0) ? x : -x);
-    if (x < 0) {
-        *this = -(*this);
-    }
+    sign = (a > 0);
+    int64_t x = a;
     sign = (x > 0);
+    if (x < 0) {
+        x = x ^ (MAX_DIGIT + 1ull);
+        mas.push_back(static_cast<uint32_t>(x));
+    } else {
+        mas.push_back(x);
+    }
+    shrink_to_fit();
 }
 
 big_integer& big_integer::shrink_to_fit() {
-    uint32_t to_delete = (sign ? 0 : UINT32_MAX);
+    uint32_t to_delete = (sign ? 0 : MAX_DIGIT);
     int32_t nw_size = mas.size();
     while (nw_size > 0 && mas[nw_size - 1] == to_delete) {
         nw_size--;
@@ -37,10 +40,12 @@ void swap(big_integer& a, big_integer& b) {
 
 void big_integer::fill(size_t size) {
     if (size < mas.size()) return;
-    size_t iterations_num = size - mas.size();
-    uint32_t to_fill = (sign ? 0 : UINT32_MAX);
-    for (size_t i = 0; i < iterations_num; i++) {
-        mas.push_back(to_fill);
+    size_t new_elements_count = size - mas.size();
+    uint32_t to_fill = (sign ? 0 : MAX_DIGIT);
+    size_t cur_size = mas.size();
+    mas.resize(cur_size + new_elements_count);
+    for (size_t i = 0; i < new_elements_count; i++) {
+        mas[cur_size + i] = to_fill;
     }
 }
 
@@ -55,37 +60,53 @@ big_integer& big_integer::operator=(const big_integer& other) {
     return *this;
 }
 
+big_integer& big_integer::negate() {
+    big_integer x = *this;
+    x = ~x + 1;
+    mas = x.mas;
+    sign = x.sign;
+    return *this;
+}
+
 big_integer::big_integer(std::string const& str) : big_integer() {
     if (str.empty()) {
-        return;
+        throw std::invalid_argument("empty string found");
     }
-    int loop_beg = (str[0] == '-' ? 1 : 0);
-    big_integer ten = 10;
+    for (size_t i = 0; i < str.size(); i++) {
+        if (i != 0 && !isdigit(str[i])) {
+            throw std::invalid_argument("string constains non-digit chars");
+        }
+        if (i == 0 && !isdigit(str[i]) && str[i] != '+' && str[i] != '-') {
+            throw std::invalid_argument("string contains non-digit chars");
+        }
+    }
+    int loop_beg = (str[0] == '-'  || str[0] == '+' ? 1 : 0);
+    uint32_t ten = 10;
     big_integer cur;
     for (size_t i = loop_beg; i != str.size(); i++) {
-        cur = int(str[i] - '0');
-        *this *= ten;
+        mul(ten);
+        cur = static_cast<int>(str[i] - '0');
         *this += cur;
     }
-    if (loop_beg == 1) {
-        *this = -(*this);
+    if (loop_beg == 1 && str[0] == '-') {
+        negate();
     }
 }
 
 std::string to_string(const big_integer& a) {
     std::string res;
     big_integer x = (a.sign ? a : -a);
-    big_integer ten = 10;
+    uint32_t ten = 10;
     int digit;
     while (x.mas.size() != 0) {
         big_integer cur = x % ten;
         if (cur.mas.size() == 0) {
-            digit = cur.sign ? 0 : UINT32_MAX;
+            digit = 0;
         } else {
             digit = cur.mas[0];
         }
         res.push_back('0' + digit);
-        x /= ten;
+        x = x.div(ten);
     }
     if (res.empty()) {
         res = "0";
@@ -98,9 +119,7 @@ std::string to_string(const big_integer& a) {
 }
 
 big_integer big_integer::operator+() const {
-    big_integer res;
-    res.mas = mas;
-    res.sign = sign;
+    big_integer res = *this;
     return res;
 }
 
@@ -126,7 +145,7 @@ big_integer big_integer::operator~() const {
     res.mas = mas;
     res.sign = !(sign);
     for (size_t i = 0; i < mas.size(); i++) {
-        res.mas[i] = (mas[i] ^ UINT32_MAX);
+        res.mas[i] = ~mas[i];
     }
     return res.shrink_to_fit();
 }
@@ -135,7 +154,8 @@ big_integer big_integer::operator-() const {
     if ((*this) == 0) {
         return *this;
     }
-    big_integer res = ~(*this) + 1;
+    big_integer res = *this;
+    res.negate();
     return res;
 }
 
@@ -186,20 +206,15 @@ bool operator<=(const big_integer& a, const big_integer& b) {
         return (b.sign);
     }
     big_integer x = a;
-    x.shrink_to_fit();
     big_integer y = b;
-    y.shrink_to_fit();
     if (x.mas.size() != y.mas.size()) {
         return (x.mas.size() < y.mas.size());
     }
-    std::reverse(x.mas.begin(), x.mas.end());
-    std::reverse(y.mas.begin(), y.mas.end());
-    return (x.mas <= y.mas);
-    /*for (int32_t i = x.mas.size() - 1; i >= 0; i--) {
+    for (int32_t i = x.mas.size() - 1; i >= 0; i--) {
         if (x.mas[i] != y.mas[i])
             return (x.mas[i] <= y.mas[i]);
     }
-    return true;*/
+    return true;
 }
 
 bool operator<(const big_integer& a, const big_integer& b) {
@@ -241,18 +256,29 @@ std::vector<uint32_t> multiply(const std::vector<uint32_t> &a, const std::vector
     return res;
 }
 
+big_integer big_integer::abs() {
+
+}
+
 big_integer &big_integer::operator*=(const big_integer &rhs) {
     if (rhs == 0) {
-        *this = 0;
-        return *this;
+        return *this = 0;
     }
     std::vector<uint32_t> new_mas;
     bool new_sign = true;
     if (sign != rhs.sign) {
-        new_mas = (sign ? multiply(mas, (-rhs).mas) : multiply((-(*this)).mas, rhs.mas));
+        if (sign) {
+            new_mas = multiply(mas, (-rhs).mas);
+        } else {
+            new_mas = multiply((-(*this)).mas, rhs.mas);
+        }
         new_sign = false;
     } else {
-        new_mas = (sign ? multiply(mas, rhs.mas) : multiply((-(*this)).mas, (-rhs).mas));
+        if (sign) {
+            new_mas = multiply(mas, rhs.mas);
+        } else {
+            new_mas = multiply((-(*this)).mas, (-rhs).mas);
+        }
     }
     sign = true;
     mas = new_mas;
@@ -295,7 +321,7 @@ big_integer& big_integer::operator/=(const big_integer& rhs) {
         for (int32_t t = 0; t <= N; t++) {
             __uint128_t v = a[n - t - 1], w = a[n - t - 2], x = a[n - t - 3];
             __uint128_t trial = (x ^ (w << 32u) ^ (v << 64u)) / ((y << 32u) ^ z);
-            uint32_t cur = std::min(static_cast<uint32_t>(trial), UINT32_MAX);
+            uint32_t cur = std::min(static_cast<uint32_t>(trial), MAX_DIGIT);
             bx = b;
             bx.mul(cur);
             bool decrease = false;
@@ -394,7 +420,7 @@ big_integer& big_integer::operator>>=(int rhs) {
 }
 
 uint32_t big_integer::operator[](size_t pos) const {
-    return static_cast<uint32_t>((pos >= mas.size()) ? (sign ? 0 : UINT32_MAX) : mas[pos]);
+    return static_cast<uint32_t>((pos >= mas.size()) ? (sign ? 0 : MAX_DIGIT) : mas[pos]);
 }
 
 big_integer operator/(big_integer a, big_integer const& b) { return (a /= b); }
