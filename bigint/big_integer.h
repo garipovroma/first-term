@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <gmp.h>
 #include <iosfwd>
 #include <string>
@@ -54,15 +55,16 @@ struct big_integer
 
     friend std::string to_string(big_integer const& a);
     friend void swap(big_integer &a, big_integer &b);
-    friend std::vector<uint32_t> multiply(const std::vector<uint32_t> &a, const std::vector<uint32_t> &b);
 private:
+    static std::vector<uint32_t> multiply(const std::vector<uint32_t> &a, const std::vector<uint32_t> &b);
     inline uint32_t operator[](size_t pos) const;
     big_integer& shrink_to_fit();
     void fill(size_t size);
-    big_integer div(uint32_t b);
+    big_integer& div(uint32_t b);
     big_integer& mul(uint32_t rhs);
     big_integer& negate();
-    big_integer abs();
+    big_integer abs() const;
+    big_integer& bit_operator(big_integer const& a,  const std::function<uint32_t(uint32_t, uint32_t)> &function);
 private:
     std::vector <uint32_t> mas;
     bool sign;
