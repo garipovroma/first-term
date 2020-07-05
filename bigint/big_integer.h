@@ -7,6 +7,7 @@
 #include <gmp.h>
 #include <iosfwd>
 #include <string>
+#include <stdexcept>
 #include <vector>
 
 
@@ -60,6 +61,8 @@ private:
     void fill(size_t size);
     big_integer div(uint32_t b);
     big_integer& mul(uint32_t rhs);
+    big_integer& negate();
+    big_integer abs();
 private:
     std::vector <uint32_t> mas;
     bool sign;
