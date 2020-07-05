@@ -239,7 +239,7 @@ big_integer& big_integer::mul(uint32_t rhs) {
     return shrink_to_fit();
 }
 
-std::vector<uint32_t> multiply(const std::vector<uint32_t> &a, const std::vector<uint32_t> &b) {
+std::vector<uint32_t> big_integer::multiply(const std::vector<uint32_t> &a, const std::vector<uint32_t> &b) {
     size_t n = a.size(), m = b.size();
     std::vector<uint32_t> res(n + m);
     for (size_t i = 0; i < n; i++) {
@@ -256,8 +256,12 @@ std::vector<uint32_t> multiply(const std::vector<uint32_t> &a, const std::vector
     return res;
 }
 
-big_integer big_integer::abs() {
-
+big_integer big_integer::abs() const {
+    if (sign) {
+        return *this;
+    } else {
+        return -(*this);
+    }
 }
 
 big_integer &big_integer::operator*=(const big_integer &rhs) {
@@ -294,72 +298,69 @@ big_integer operator*(big_integer a, const big_integer& b) {
     return a;
 }
 
-big_integer big_integer::div(uint32_t b) {
+big_integer& big_integer::div(uint32_t b) {
     uint64_t rem = 0;
-    big_integer res;
-    res.fill(mas.size());
     for (int i = mas.size() - 1; i >= 0; i--) {
-        res.mas[i] = static_cast<uint32_t>(((*this)[i] + (rem << 32u)) / b);
-        rem = ((*this)[i] + (rem << 32u)) % b;
+        uint64_t tmp = (*this)[i];
+        uint32_t cur = static_cast<uint32_t>((tmp + (rem << 32u)) / b);
+        mas[i] = cur;
+        rem = (tmp + (rem << 32u)) % b;
     }
-    return res.shrink_to_fit();
+    return shrink_to_fit();
 }
 
 big_integer& big_integer::operator/=(const big_integer& rhs) {
-    big_integer a = (sign ? *this : -(*this));
-    big_integer b = (rhs.sign ? rhs : -rhs);
+    big_integer a = abs();
+    big_integer b = rhs.abs();
     bool new_sign = (sign != rhs.sign);
-    if (b <= a && b.mas.size() > 1) {
-        big_integer bx;
-        a.mas.push_back(0);
-        size_t n = a.mas.size();
-        size_t m = b.mas.size();
-        *this = 0;
-        fill(n - m + 1);
-        __uint128_t y = b[m - 1], z = b[m - 2];
-        int32_t N = n - m - 1;
-        for (int32_t t = 0; t <= N; t++) {
-            __uint128_t v = a[n - t - 1], w = a[n - t - 2], x = a[n - t - 3];
-            __uint128_t trial = (x ^ (w << 32u) ^ (v << 64u)) / ((y << 32u) ^ z);
-            uint32_t cur = std::min(static_cast<uint32_t>(trial), MAX_DIGIT);
-            bx = b;
-            bx.mul(cur);
-            bool decrease = false;
-            int32_t i = n - m - t - 1;
-            for (int32_t j = m + i, k = j - i; j >= i; j--, k--) {
-                if (a[j] != bx[k]) {
-                    decrease = a[j] < bx[k];
-                    break;
-                }
-            }
-            if (decrease) {
-                cur--;
-                bx -= b;
-            }
-            mas[i] = cur;
-            uint64_t tmp;
-            cur = 0;
-            for (size_t j = i; j <= i + m; j++) {
-                tmp = (static_cast<uint64_t>(a[j]) - bx[j - i] - cur);
-                cur = (bx[j - i] + cur) > a[j];
-                a.mas[j] = static_cast<uint32_t>(tmp);
-            }
-        }
+    if (b.mas.size() == 1) {
+        *this = a.div(b[0]);
         if (new_sign) {
             *this = -(*this);
         }
-        return shrink_to_fit();
-    } else {
-        if (b.mas.size() == 1) {
-            *this = a.div(b[0]);
-            if (new_sign) {
-                *this = -(*this);
-            }
-        } else {
-            *this = 0;
-        }
         return *this;
     }
+    if (a < b) {
+        return (*this = 0);
+    }
+    a.mas.push_back(0);
+    size_t n = a.mas.size();
+    size_t m = b.mas.size();
+    *this = 0;
+    fill(n - m + 1);
+    __uint128_t y = b[m - 1], z = b[m - 2];
+    int32_t N = n - m - 1;
+    for (int32_t t = 0; t <= N; t++) {
+        __uint128_t v = a[n - t - 1], w = a[n - t - 2], x = a[n - t - 3];
+        __uint128_t trial = (x ^ (w << 32u) ^ (v << 64u)) / ((y << 32u) ^ z);
+        uint32_t cur = std::min(static_cast<uint32_t>(trial), MAX_DIGIT);
+        big_integer bx = b;
+        bx.mul(cur);
+        bool decrease = false;
+        int32_t i = n - m - t - 1;
+        for (int32_t j = m + i, k = j - i; j >= i; j--, k--) {
+            if (a[j] != bx[k]) {
+                decrease = a[j] < bx[k];
+                break;
+            }
+        }
+        if (decrease) {
+            cur--;
+            bx -= b;
+        }
+        mas[i] = cur;
+        uint64_t tmp;
+        cur = 0;
+        for (size_t j = i; j <= i + m; j++) {
+            tmp = (static_cast<uint64_t>(a[j]) - bx[j - i] - cur);
+            cur = (bx[j - i] + cur) > a[j];
+            a.mas[j] = static_cast<uint32_t>(tmp);
+        }
+    }
+    if (new_sign) {
+        *this = -(*this);
+    }
+    return shrink_to_fit();
 }
 
 std::ostream& operator<<(std::ostream& s, const big_integer& a) {
@@ -372,50 +373,59 @@ big_integer& big_integer::operator%=(big_integer const& rhs) {
     return *this;
 }
 
-big_integer& big_integer::operator&=(big_integer const& rhs) {
+big_integer& big_integer::bit_operator(big_integer const& rhs,  const std::function<uint32_t(uint32_t, uint32_t)> &function) {
     fill(rhs.mas.size());
-    for (size_t i = 0; i < mas.size(); i++) {
-        mas[i] &= rhs[i];
+    for (size_t i = 0; i < rhs.mas.size(); i++) {
+        mas[i] = function(rhs[i], mas[i]);
     }
-    sign = !((!sign) & (!rhs.sign));
+    sign = !function(!sign, !rhs.sign);
     return shrink_to_fit();
+}
+
+big_integer& big_integer::operator&=(big_integer const& rhs) {
+    return bit_operator(rhs, [](uint32_t x, uint32_t y) { return x & y;});
 }
 
 big_integer& big_integer::operator|=(big_integer const& rhs) {
-    fill(rhs.mas.size());
-    for (size_t i = 0; i < mas.size(); i++) {
-        mas[i] |= rhs[i];
-    }
-    sign = !((!sign) | (!rhs.sign));
-    return shrink_to_fit();
+    return bit_operator(rhs, [](uint32_t x, uint32_t y) { return x | y;});
 }
 
 big_integer& big_integer::operator^=(big_integer const& rhs) {
-    fill(rhs.mas.size());
-    for (size_t i = 0; i < mas.size(); i++) {
-        mas[i] ^= rhs[i];
-    }
-    sign = !((!sign) ^ (!rhs.sign));
-    return shrink_to_fit();
+    return bit_operator(rhs, [](uint32_t x, uint32_t y) { return x ^ y;});
 }
 
 big_integer& big_integer::operator<<=(int rhs) {
-    big_integer TWO = 2;
-    size_t n = rhs;
-    for (size_t i = 0; i < n; i++) {
-        (*this) *= TWO;
+    if (rhs < 0) {
+        return ((*this) >>= -rhs);
     }
-    return *this;
+    size_t n = rhs / 32;
+    size_t m = rhs % 32;
+    big_integer cur = abs().mul(1u << m);
+    std::reverse(cur.mas.begin(), cur.mas.end());
+    size_t was = cur.mas.size();
+    cur.mas.resize(was + n);
+    for (size_t i = 0; i < n; i++) {
+        cur.mas[was + i] = 0;
+    }
+    std::reverse(cur.mas.begin(), cur.mas.end());
+    mas = cur.mas;
+    if (!sign) {
+        cur = -cur;
+    }
+    return (*this = cur);
 }
 
 big_integer& big_integer::operator>>=(int rhs) {
-    big_integer x = (sign ? *this : -(*this));
-    big_integer TWO = 2;
-    size_t n = rhs;
-    for (size_t i = 0; i < n; i++) {
-        x /= TWO;
+    if (rhs < 0) {
+        return ((*this) <<= -rhs);
     }
-    *this = (sign ? x : -x - 1);
+    size_t n = rhs / 32;
+    size_t m = rhs % 32;
+    big_integer cur = abs().div(1u << m);
+    std::reverse(cur.mas.begin(), cur.mas.end());
+    cur.mas.erase(cur.mas.end() - n, cur.mas.end());
+    std::reverse(cur.mas.begin(), cur.mas.end());
+    *this = (sign ? cur : -cur - 1);
     return *this;
 }
 
