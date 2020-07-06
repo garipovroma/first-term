@@ -3,7 +3,6 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <cstdint>
 #include <functional>
 #include <gmp.h>
 #include <iosfwd>
@@ -65,6 +64,7 @@ private:
     big_integer& negate();
     big_integer abs() const;
     big_integer& bit_operator(big_integer const& a,  const std::function<uint32_t(uint32_t, uint32_t)> &function);
+    uint32_t get_end_of_mas() const;
 private:
     std::vector <uint32_t> mas;
     bool sign;
