@@ -293,6 +293,9 @@ big_integer operator*(big_integer a, const big_integer& b) {
 }
 
 big_integer& big_integer::div(uint32_t b) {
+    if (b == 0) {
+        throw std::runtime_error("divide by zero");
+    }
     uint64_t rem = 0;
     std::vector <uint32_t> new_mas = mas;
     for (size_t i = mas.size(); i >= 1; i--) {
