@@ -1,9 +1,15 @@
 #ifndef BIG_INTEGER_H
 #define BIG_INTEGER_H
 
+#include <algorithm>
+#include "storage.h"
 #include <cstddef>
+#include <functional>
 #include <gmp.h>
 #include <iosfwd>
+#include <string>
+#include <stdexcept>
+
 
 struct big_integer
 {
@@ -12,7 +18,6 @@ struct big_integer
     big_integer(int a);
     explicit big_integer(std::string const& str);
     ~big_integer();
-
     big_integer& operator=(big_integer const& other);
 
     big_integer& operator+=(big_integer const& rhs);
@@ -47,9 +52,24 @@ struct big_integer
 
     friend std::string to_string(big_integer const& a);
 
+    friend std::string to_string(big_integer const& a);
+    friend void swap(big_integer &a, big_integer &b);
 private:
-    mpz_t mpz;
+    static storage multiply(const std::vector<uint32_t> &a, const std::vector<uint32_t> &b);
+    uint32_t operator[](size_t pos) const;
+    big_integer& shrink_to_fit();
+    void fill(size_t size);
+    big_integer& div(uint32_t b);
+    big_integer& mul(uint32_t rhs);
+    big_integer& negate();
+    big_integer abs() const;
+    big_integer& bit_operator(big_integer const& a,  const std::function<uint32_t(uint32_t, uint32_t)> &function);
+    uint32_t get_end_of_mas() const;
+private:
+    storage mas;
+    bool sign;
 };
+
 
 big_integer operator+(big_integer a, big_integer const& b);
 big_integer operator-(big_integer a, big_integer const& b);
