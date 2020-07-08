@@ -16,13 +16,7 @@ void storage::unshare() {
 }
 
 storage::~storage() {
-    if (small) {
-        return;
-    }
-    data->dec_ref_counter();
-    if (data->get_ref_counter() == 0) {
-        delete data;
-    }
+    delete_current_buffer();
 }
 
 std::vector<uint32_t> storage::get_mas_copy() const {
@@ -67,10 +61,12 @@ void storage::check_ref_counter() {
 }
 
 void storage::delete_current_buffer() {
-    if (data->get_ref_counter() == 1) {
-        delete data;
-    } else {
-        data->dec_ref_counter();
+    if (!small) {
+        if (data->get_ref_counter() == 1) {
+            delete data;
+        } else {
+            data->dec_ref_counter();
+        }
     }
 }
 
@@ -78,9 +74,7 @@ storage& storage::operator=(storage const& other) {
     if (this == &other) {
         return *this;
     }
-    if (!small) {
-        delete_current_buffer();
-    }
+    delete_current_buffer();
     if (other.small) {
         std::copy(other.static_mas, other.static_mas + other.sz, static_mas);
     } else {
