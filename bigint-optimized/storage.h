@@ -37,7 +37,7 @@ struct storage {
     static const size_t SMALL_SIZE = 8;
 private:
     void unshare();
-    bool check_ref_counter();
+    void check_ref_counter();
 private:
     size_t sz;
     bool small;

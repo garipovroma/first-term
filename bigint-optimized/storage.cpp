@@ -1,16 +1,16 @@
 //
 // Created by roma on 07.07.2020.
 //
-#include "storage.h"
 #include "buffer.h"
+#include <cassert>
+#include "storage.h"
 
-storage::storage() : sz(0), small(true) {
-    std::fill(static_mas, static_mas + SMALL_SIZE, 0u);
-}
+
+storage::storage() : sz(0), small(true) {}
 
 void storage::unshare() {
-    buffer *new_data = new buffer();
-    new_data->get_mas() = data->get_mas();
+    assert(data->get_ref_counter() > 1);
+    buffer *new_data = new buffer(data->get_mas());
     data->dec_ref_counter();
     data = new_data;
 }
@@ -36,20 +36,38 @@ std::vector<uint32_t> storage::get_mas_copy() const {
 }
 
 bool storage::operator==(storage const& other) const {
-    return (get_mas_copy()) == (other.get_mas_copy());
+    bool ok = (sz == other.sz);
+    if (!ok) {
+        return false;
+    }
+    if (small && other.small) {
+        for (size_t i = 0; i < sz; i++) {
+            ok &= (static_mas[i] == other.static_mas[i]);
+        }
+    } else if (small && !other.small) {
+        for (size_t i = 0; i < sz; i++) {
+            ok &= (static_mas[i] == other.data->get_mas()[i]);
+        }
+    } else if (!small && other.small) {
+        for (size_t i = 0; i < sz; i++) {
+            ok &= (data->get_mas()[i] == other.static_mas[i]);
+        }
+    } else if (!small && !other.small) {
+        for (size_t i = 0; i < sz; i++) {
+            ok &= (data->get_mas()[i] == other.data->get_mas()[i]);
+        }
+    }
+    return ok;
 }
 
-bool storage::check_ref_counter() {
-    if (data->get_ref_counter() == 1) {
-        return false;
-    } else {
+void storage::check_ref_counter() {
+    if (data->get_ref_counter() > 1) {
         unshare();
-        return true;
     }
 }
 
 storage& storage::operator=(storage const& other) {
-    if (*this == other) {
+    if (this == &other) {
         return *this;
     }
     if (!small) {
@@ -75,7 +93,6 @@ storage& storage::operator=(storage const& other) {
 
 storage::storage(storage const& other) {
     if (other.small) {
-        std::fill(static_mas, static_mas + SMALL_SIZE, 0u);
         std::copy(other.static_mas, other.static_mas + other.sz, static_mas);
     } else {
         data = other.data;
@@ -112,6 +129,7 @@ uint32_t& storage::operator[](size_t pos) {
 }
 
 void storage::erase(size_t l, size_t r) {
+    assert(l <= r && r < sz);
     if (small) {
         for (size_t i = l, j = r; i < sz && j < sz; i++, j++) {
             static_mas[i] = static_mas[j];
@@ -137,11 +155,9 @@ void storage::push_back(uint32_t val) {
         static_mas[sz] = val;
         sz++;
     } else if (small && sz == SMALL_SIZE) {
-        std::vector <uint32_t> cur_mas(sz + 1);
-        std::copy(static_mas, static_mas + SMALL_SIZE, cur_mas.begin());
-        data = new buffer(0);
-        data->get_mas() = cur_mas;
-        (data->get_mas())[sz] = val;
+        std::vector <uint32_t> cur_mas(static_mas, static_mas + SMALL_SIZE);
+        cur_mas.push_back(val);
+        data = new buffer(cur_mas);
         sz++;
         small = false;
     } else {
@@ -175,10 +191,10 @@ void storage::resize(size_t nw_size) {
 void storage::resize(size_t nw_size, uint32_t val) {
     if (small) {
         if (nw_size > sz && nw_size > SMALL_SIZE) {
-            std::vector<uint32_t> vec = get_mas_copy();
-            data = new buffer(nw_size);
-            std::copy(vec.begin(), vec.end(), data->get_mas().begin());
-            std::fill(data->get_mas().begin() + sz, data->get_mas().begin() + nw_size, val);
+            std::vector<uint32_t> vec(nw_size);
+            std::copy(static_mas, static_mas + sz, vec.begin());
+            std::fill(vec.begin() + sz, vec.begin() + nw_size, val);
+            data = new buffer(vec);
             sz = nw_size;
             small = false;
         } else if (nw_size > sz && nw_size <= SMALL_SIZE) {

@@ -14,6 +14,7 @@ struct buffer {
 public:
     buffer(size_t sz);
     buffer();
+    buffer(std::vector<uint32_t> vec);
     ~buffer();
     size_t get_ref_counter() const;
     size_t inc_ref_counter();
