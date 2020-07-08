@@ -24,6 +24,6 @@ std::vector<uint32_t> &buffer::get_mas() {
 
 buffer::buffer() : ref_counter(1), mas(std::vector<uint32_t>()) {}
 
-buffer::buffer(std::vector<uint32_t> vec) : ref_counter(1), mas(vec) {}
+buffer::buffer(std::vector<uint32_t> vec) : ref_counter(1), mas(std::move(vec)) {}
 
 buffer::~buffer() = default;

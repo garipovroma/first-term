@@ -23,7 +23,7 @@ struct storage {
 
     void push_back(uint32_t val);
     size_t size() const;
-    uint32_t back();
+    uint32_t& back();
     void resize(size_t nw_size, uint32_t val);
     void resize(size_t nw_size);
     void reverse();
@@ -37,6 +37,7 @@ struct storage {
     static const size_t SMALL_SIZE = 8;
 private:
     void unshare();
+    void delete_current_buffer();
     void check_ref_counter();
 private:
     size_t sz;

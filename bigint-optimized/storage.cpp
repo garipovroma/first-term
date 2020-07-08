@@ -66,21 +66,22 @@ void storage::check_ref_counter() {
     }
 }
 
+void storage::delete_current_buffer() {
+    if (data->get_ref_counter() == 1) {
+        delete data;
+    } else {
+        data->dec_ref_counter();
+    }
+}
+
 storage& storage::operator=(storage const& other) {
     if (this == &other) {
         return *this;
     }
     if (!small) {
-        if (data->get_ref_counter() == 1) {
-            delete data;
-        } else {
-            data->dec_ref_counter();
-        }
+        delete_current_buffer();
     }
     if (other.small) {
-        if (!small) {
-            std::fill(static_mas, static_mas + SMALL_SIZE, 0u);
-        }
         std::copy(other.static_mas, other.static_mas + other.sz, static_mas);
     } else {
         data = other.data;
@@ -175,7 +176,7 @@ size_t storage::size() const {
     }
 }
 
-uint32_t storage::back() {
+uint32_t& storage::back() {
     if (small) {
         return static_mas[sz - 1];
     } else {
